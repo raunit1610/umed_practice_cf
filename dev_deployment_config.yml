@@ -1,0 +1,7 @@
+template-file-path: ./umed_s3_buckets_cf_script.yaml
+
+parameters:
+  Environment: devil
+  KmsKeyArn: arn:aws:kms:ap-south-1:008300323897:key/de1f8be2-21f9-462b-ac91-c662a4eafe0e
+  EnableProdServerLogging: "false"
+
