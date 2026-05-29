@@ -3,49 +3,84 @@ Description: >
   uMed EHR Data Platform: S3 Bucket Stack
   Creates all eight S3 buckets (Raw, Staging, Intermediate, Data Warehouse,
   Analytics, Audit, Control, Athena Results) for a single environment with
-  full HIPAA-compliant configuration.
+  full HIPAA-compliant configuration. Deploy once per environment (dev/qa/uat/prod)
+  supplying the environment name and KMS CMK ARN.
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Parameters
+# ──────────────────────────────────────────────────────────────────────────────
 Parameters:
+
   Environment:
     Type: String
     AllowedValues: [devil, qail, uatil, prodil]
-    Description: Deployment environment.
+    Description: Deployment environment. Controls bucket naming and prod-only features.
 
   KmsKeyArn:
     Type: String
-    Description: ARN of the Customer Managed Key (CMK).
+    Description: >
+      ARN of the Customer Managed Key (CMK) for this environment.
+      Create one KMS key per environment (e.g. alias/umed-dev, alias/umed-prod)
+      and supply its ARN here.
 
   EnableProdServerLogging:
     Type: String
     AllowedValues: ["true", "false"]
     Default: "false"
-    Description: Enable server access logging.
+    Description: >
+      Set to true for prod. Enables server access logging on Raw, Staging,
+      Intermediate, and DW buckets. Logs are written to the Audit bucket.
+      The Audit bucket itself relies on CloudTrail Data Events instead of
+      server access logging, removing the need for a separate log bucket.
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Conditions
+# ──────────────────────────────────────────────────────────────────────────────
 Conditions:
+
+  IsProd: !Equals [!Ref Environment, prod]
+
   EnableDataBucketLogging: !Equals [!Ref EnableProdServerLogging, "true"]
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Resources
+# ──────────────────────────────────────────────────────────────────────────────
 Resources:
 
+  # ============================================================
+  # 1. RAW BUCKET  –  umed-raw-ehr-{env}
+  # Stores: original FHIR NDJSON records  (immutable source)
+  # ============================================================
   RawBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "umed-raw-ehr-${Environment}"
+
+      # Block all public access 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
         BlockPublicPolicy: true
         RestrictPublicBuckets: true
+
+      # Object ownership 
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning disabled 
       VersioningConfiguration:
         Status: Suspended
+
+      # SSE-KMS with Customer Managed Key + Bucket Key 
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
               KMSMasterKeyID: !Ref KmsKeyArn
+
+      # Lifecycle – transition to Glacier Instant Retrieval after 90 days
       LifecycleConfiguration:
         Rules:
           - Id: RawToGlacierIR
@@ -53,108 +88,189 @@ Resources:
             Transitions:
               - StorageClass: GLACIER_IR
                 TransitionInDays: 90
-      LoggingConfiguration:
-        Fn::If:
-          - EnableDataBucketLogging
-          - DestinationBucketName: !Ref AuditBucket
-            LogFilePrefix: !Sub "server-access-logs/raw-${Environment}/"
-          - !Ref AWS::NoValue
 
+      # Server access logging 
+      LoggingConfiguration: !If
+        - EnableDataBucketLogging
+        - DestinationBucketName: !Ref AuditBucket
+          LogFilePrefix: !Sub "server-access-logs/raw-${Environment}/"
+        - !Ref AWS::NoValue
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: raw
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+  # ============================================================
+  # 2. STAGING BUCKET  –  umed-stg-ehr-{env}
+  # Stores: normalized and flattened FHIR data 
+  # ============================================================
   StagingBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "umed-stg-ehr-${Environment}"
+
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
         BlockPublicPolicy: true
         RestrictPublicBuckets: true
+
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
+
       VersioningConfiguration:
         Status: Suspended
+
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
               KMSMasterKeyID: !Ref KmsKeyArn
-      LoggingConfiguration:
-        Fn::If:
-          - EnableDataBucketLogging
-          - DestinationBucketName: !Ref AuditBucket
-            LogFilePrefix: !Sub "server-access-logs/staging-${Environment}/"
-          - !Ref AWS::NoValue
 
+      LoggingConfiguration: !If
+        - EnableDataBucketLogging
+        - DestinationBucketName: !Ref AuditBucket
+          LogFilePrefix: !Sub "server-access-logs/staging-${Environment}/"
+        - !Ref AWS::NoValue
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: staging
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+  # ============================================================
+  # 3. INTERMEDIATE BUCKET  –  umed-int-ehr-{env}
+  # Stores: buisness specific datasets 
+  # ============================================================
   IntermediateBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "umed-int-ehr-${Environment}"
+
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
         BlockPublicPolicy: true
         RestrictPublicBuckets: true
+
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
+
       VersioningConfiguration:
         Status: Suspended
+
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
               KMSMasterKeyID: !Ref KmsKeyArn
-      LoggingConfiguration:
-        Fn::If:
-          - EnableDataBucketLogging
-          - DestinationBucketName: !Ref AuditBucket
-            LogFilePrefix: !Sub "server-access-logs/intermediate-${Environment}/"
-          - !Ref AWS::NoValue
 
+      LoggingConfiguration: !If
+        - EnableDataBucketLogging
+        - DestinationBucketName: !Ref AuditBucket
+          LogFilePrefix: !Sub "server-access-logs/intermediate-${Environment}/"
+        - !Ref AWS::NoValue
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: intermediate
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+  # ============================================================
+  # 4. DATA WAREHOUSE BUCKET  –  umed-dw-{env}
+  # Stores: final analytical tables 
+  # ============================================================
   DataWarehouseBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "umed-dw-${Environment}"
+
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
         BlockPublicPolicy: true
         RestrictPublicBuckets: true
+
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
+
       VersioningConfiguration:
         Status: Suspended
+
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
               KMSMasterKeyID: !Ref KmsKeyArn
-      LoggingConfiguration:
-        Fn::If:
-          - EnableDataBucketLogging
-          - DestinationBucketName: !Ref AuditBucket
-            LogFilePrefix: !Sub "server-access-logs/dw-${Environment}/"
-          - !Ref AWS::NoValue
 
+      LoggingConfiguration: !If
+        - EnableDataBucketLogging
+        - DestinationBucketName: !Ref AuditBucket
+          LogFilePrefix: !Sub "server-access-logs/dw-${Environment}/"
+        - !Ref AWS::NoValue
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: dw
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+  # ============================================================
+  # 5. ANALYTICS BUCKET  –  umed-analytics-{env}
+  # Stores: pre-built reports and aggregated outputs
+  # ============================================================
   AnalyticsBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "umed-analytics-${Environment}"
+
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
         BlockPublicPolicy: true
         RestrictPublicBuckets: true
+
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
+
       VersioningConfiguration:
         Status: Suspended
+
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - BucketKeyEnabled: true
@@ -162,34 +278,79 @@ Resources:
               SSEAlgorithm: aws:kms
               KMSMasterKeyID: !Ref KmsKeyArn
 
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: analytics
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+  # ============================================================
+  # 6. AUDIT BUCKET  –  umed-audit-logs-{env}
+  # Stores: HIPAA audit trail, file-level and table-level audit records
+  #         for each pipeline layer
+  #
+  # HIPAA requirements drive special settings:
+  #   • Versioning ENABLED (required for Object Lock)
+  #   • Object Lock COMPLIANCE mode, 7-year retention (6yr HIPAA + 1yr buffer)
+  #   • Server access logging NOT used – CloudTrail Data Events provide the
+  #     equivalent tamper-proof access record without a self-referential
+  #     circular dependency. Enable CloudTrail Data Events post-deployment.
+  #   • NO lifecycle transitions – records must remain query-accessible
+  # ============================================================
   AuditBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "umed-audit-logs-${Environment}"
+
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
         BlockPublicPolicy: true
         RestrictPublicBuckets: true
+
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning MUST be enabled for Object Lock
       VersioningConfiguration:
         Status: Enabled
+
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
               KMSMasterKeyID: !Ref KmsKeyArn
+
+      # Object Lock – COMPLIANCE mode, 7 years (2555 days)
       ObjectLockEnabled: true
       ObjectLockConfiguration:
         ObjectLockEnabled: Enabled
         Rule:
           DefaultRetention:
             Mode: COMPLIANCE
-            Days: 2555
+            Days: 2555  
 
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: audit
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+  # Bucket policy (allows CloudTrail to write to the audit bucket)
   AuditBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -203,6 +364,7 @@ Resources:
               Service: cloudtrail.amazonaws.com
             Action: s3:GetBucketAcl
             Resource: !GetAtt AuditBucket.Arn
+
           - Sid: AllowCloudTrailPutObject
             Effect: Allow
             Principal:
@@ -213,26 +375,37 @@ Resources:
               StringEquals:
                 s3:x-amz-acl: bucket-owner-full-control
 
+  # ============================================================
+  # 7. CONTROL BUCKET  –  umed-control-registry-{env}
+  # Stores: pipeline state files and checkpoint records
+  # ============================================================
   ControlBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "umed-control-registry-${Environment}"
+
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
         BlockPublicPolicy: true
         RestrictPublicBuckets: true
+
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning enabled for checkpoint history recovery
       VersioningConfiguration:
         Status: Enabled
+
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
               KMSMasterKeyID: !Ref KmsKeyArn
+
+      # Expire non-current versions after 30 days to control storage cost
       LifecycleConfiguration:
         Rules:
           - Id: ExpireNonCurrentVersions
@@ -240,28 +413,163 @@ Resources:
             NoncurrentVersionExpiration:
               NoncurrentDays: 30
 
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: control
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+  # ============================================================
+  # 8. ATHENA RESULTS BUCKET  –  umed-athena-results-{env}
+  # Stores: temporary Athena query result files
+  # ============================================================
   AthenaResultsBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "umed-athena-results-${Environment}"
+
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
         BlockPublicPolicy: true
         RestrictPublicBuckets: true
+
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
+
       VersioningConfiguration:
         Status: Suspended
+
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
               KMSMasterKeyID: !Ref KmsKeyArn
+
+      # Delete Athena results after 7 days 
       LifecycleConfiguration:
         Rules:
           - Id: DeleteAthenaResults
             Status: Enabled
             ExpirationInDays: 7
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: athena-results
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Outputs
+# ──────────────────────────────────────────────────────────────────────────────
+Outputs:
+
+  RawBucketName:
+    Description: Raw FHIR records bucket name
+    Value: !Ref RawBucket
+    Export:
+      Name: !Sub "umed-${Environment}-raw-bucket-name"
+
+  RawBucketArn:
+    Description: Raw FHIR records bucket ARN
+    Value: !GetAtt RawBucket.Arn
+    Export:
+      Name: !Sub "umed-${Environment}-raw-bucket-arn"
+
+  StagingBucketName:
+    Description: Staging bucket name
+    Value: !Ref StagingBucket
+    Export:
+      Name: !Sub "umed-${Environment}-staging-bucket-name"
+
+  StagingBucketArn:
+    Description: Staging bucket ARN
+    Value: !GetAtt StagingBucket.Arn
+    Export:
+      Name: !Sub "umed-${Environment}-staging-bucket-arn"
+
+  IntermediateBucketName:
+    Description: Intermediate bucket name
+    Value: !Ref IntermediateBucket
+    Export:
+      Name: !Sub "umed-${Environment}-intermediate-bucket-name"
+
+  IntermediateBucketArn:
+    Description: Intermediate bucket ARN
+    Value: !GetAtt IntermediateBucket.Arn
+    Export:
+      Name: !Sub "umed-${Environment}-intermediate-bucket-arn"
+
+  DataWarehouseBucketName:
+    Description: Data Warehouse bucket name
+    Value: !Ref DataWarehouseBucket
+    Export:
+      Name: !Sub "umed-${Environment}-dw-bucket-name"
+
+  DataWarehouseBucketArn:
+    Description: Data Warehouse bucket ARN
+    Value: !GetAtt DataWarehouseBucket.Arn
+    Export:
+      Name: !Sub "umed-${Environment}-dw-bucket-arn"
+
+  AnalyticsBucketName:
+    Description: Analytics bucket name
+    Value: !Ref AnalyticsBucket
+    Export:
+      Name: !Sub "umed-${Environment}-analytics-bucket-name"
+
+  AnalyticsBucketArn:
+    Description: Analytics bucket ARN
+    Value: !GetAtt AnalyticsBucket.Arn
+    Export:
+      Name: !Sub "umed-${Environment}-analytics-bucket-arn"
+
+  AuditBucketName:
+    Description: Audit logs bucket name
+    Value: !Ref AuditBucket
+    Export:
+      Name: !Sub "umed-${Environment}-audit-bucket-name"
+
+  AuditBucketArn:
+    Description: Audit logs bucket ARN (use in CloudTrail configuration)
+    Value: !GetAtt AuditBucket.Arn
+    Export:
+      Name: !Sub "umed-${Environment}-audit-bucket-arn"
+
+  ControlBucketName:
+    Description: Control / registry bucket name
+    Value: !Ref ControlBucket
+    Export:
+      Name: !Sub "umed-${Environment}-control-bucket-name"
+
+  ControlBucketArn:
+    Description: Control / registry bucket ARN
+    Value: !GetAtt ControlBucket.Arn
+    Export:
+      Name: !Sub "umed-${Environment}-control-bucket-arn"
+
+  AthenaResultsBucketName:
+    Description: Athena query results bucket name
+    Value: !Ref AthenaResultsBucket
+    Export:
+      Name: !Sub "umed-${Environment}-athena-results-bucket-name"
+
+  AthenaResultsBucketArn:
+    Description: Athena query results bucket ARN
+    Value: !GetAtt AthenaResultsBucket.Arn
+    Export:
+      Name: !Sub "umed-${Environment}-athena-results-bucket-arn"
