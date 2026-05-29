@@ -13,7 +13,7 @@ Parameters:
 
   Environment:
     Type: String
-    AllowedValues: [dev, qa, uat, prod]
+    AllowedValues: [devil, qail, uatil, prodil]
     Description: Deployment environment. Controls bucket naming and prod-only features.
 
   KmsKeyArn:
