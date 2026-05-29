@@ -1,0 +1,6 @@
+template-file-path: ./umed_s3_buckets_cf_script.yml
+
+parameters:
+  Environment: prodil
+  KmsKeyArn: arn:aws:kms:ap-south-1:008300323897:key/3d6513c3-f79a-4bc6-8028-328f4ce07315
+  EnableProdServerLogging: "true"

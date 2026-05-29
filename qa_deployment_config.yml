@@ -1,0 +1,7 @@
+template-file-path: ./umed_s3_buckets_cf_script.yml
+
+parameters:
+  Environment: qail
+  KmsKeyArn: arn:aws:kms:ap-south-1:008300323897:key/0d2f6c08-75d3-4d3d-b182-edcc27c74a5f
+  EnableProdServerLogging: "false"
+
