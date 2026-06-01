@@ -1,4 +1,5 @@
-template-file-path: ./umed_s3_buckets_cf_script.yml
-
+template-file-path: umed_s3_buckets_cf_script.yml
 parameters:
+  EnableProdServerLogging: 'true'
   Environment: prodil
+tags: {}
