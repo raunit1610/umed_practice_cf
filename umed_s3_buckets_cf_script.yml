@@ -16,31 +16,12 @@ Parameters:
     AllowedValues: [devil, qail, uatil, prodil]
     Description: Deployment environment. Controls bucket naming and prod-only features.
 
-  # KmsKeyArn:
-  #   Type: String
-  #   Description: >
-  #     ARN of the Customer Managed Key (CMK) for this environment.
-  #     Create one KMS key per environment (e.g. alias/umed-dev, alias/umed-prod)
-  #     and supply its ARN here.
-
-  # EnableProdServerLogging:
-  #   Type: String
-  #   AllowedValues: ["true", "false"]
-  #   Default: "false"
-  #   Description: >
-  #     Set to true for prod. Enables server access logging on Raw, Staging,
-  #     Intermediate, and DW buckets. Logs are written to the Audit bucket.
-  #     The Audit bucket itself relies on CloudTrail Data Events instead of
-  #     server access logging, removing the need for a separate log bucket.
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Conditions
 # ──────────────────────────────────────────────────────────────────────────────
 Conditions:
 
   IsProd: !Equals [!Ref Environment, prodil]
-
-  # EnableDataBucketLogging: !Equals [!Ref EnableProdServerLogging, "true"]
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Resources
