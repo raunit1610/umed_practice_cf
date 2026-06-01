@@ -16,36 +16,42 @@ Parameters:
     AllowedValues: [devil, qail, uatil, prodil]
     Description: Deployment environment. Controls bucket naming and prod-only features.
 
-  KmsKeyArn:
-    Type: String
-    Description: >
-      ARN of the Customer Managed Key (CMK) for this environment.
-      Create one KMS key per environment (e.g. alias/umed-dev, alias/umed-prod)
-      and supply its ARN here.
-
-  EnableProdServerLogging:
-    Type: String
-    AllowedValues: ["true", "false"]
-    Default: "false"
-    Description: >
-      Set to true for prod. Enables server access logging on Raw, Staging,
-      Intermediate, and DW buckets. Logs are written to the Audit bucket.
-      The Audit bucket itself relies on CloudTrail Data Events instead of
-      server access logging, removing the need for a separate log bucket.
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Conditions
 # ──────────────────────────────────────────────────────────────────────────────
 Conditions:
 
-  IsProd: !Equals [!Ref Environment, prod]
-
-  EnableDataBucketLogging: !Equals [!Ref EnableProdServerLogging, "true"]
+  IsProd: !Equals [!Ref Environment, prodil]
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Resources
 # ──────────────────────────────────────────────────────────────────────────────
 Resources:
+
+  # =====================================================
+# KMS KEY
+# =====================================================
+
+  KmsKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub "uMed ${Environment} S3 Encryption Key"
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowRootAccount
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: "kms:*"
+            Resource: "*"
+
+  KmsAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub "alias/umed-${Environment}-s3"
+      TargetKeyId: !Ref KmsKey
 
   # ============================================================
   # 1. RAW BUCKET  –  umed-raw-ehr-{env}
@@ -78,7 +84,7 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKeyArn
+              KMSMasterKeyID: !Ref KmsKey
 
       # Lifecycle – transition to Glacier Instant Retrieval after 90 days
       LifecycleConfiguration:
@@ -91,7 +97,7 @@ Resources:
 
       # Server access logging 
       LoggingConfiguration: !If
-        - EnableDataBucketLogging
+        - IsProd
         - DestinationBucketName: !Ref AuditBucket
           LogFilePrefix: !Sub "server-access-logs/raw-${Environment}/"
         - !Ref AWS::NoValue
@@ -135,10 +141,10 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKeyArn
+              KMSMasterKeyID: !Ref KmsKey
 
       LoggingConfiguration: !If
-        - EnableDataBucketLogging
+        - IsProd
         - DestinationBucketName: !Ref AuditBucket
           LogFilePrefix: !Sub "server-access-logs/staging-${Environment}/"
         - !Ref AWS::NoValue
@@ -182,10 +188,10 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKeyArn
+              KMSMasterKeyID: !Ref KmsKey
 
       LoggingConfiguration: !If
-        - EnableDataBucketLogging
+        - IsProd
         - DestinationBucketName: !Ref AuditBucket
           LogFilePrefix: !Sub "server-access-logs/intermediate-${Environment}/"
         - !Ref AWS::NoValue
@@ -229,10 +235,10 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKeyArn
+              KMSMasterKeyID: !Ref KmsKey
 
       LoggingConfiguration: !If
-        - EnableDataBucketLogging
+        - IsProd
         - DestinationBucketName: !Ref AuditBucket
           LogFilePrefix: !Sub "server-access-logs/dw-${Environment}/"
         - !Ref AWS::NoValue
@@ -276,7 +282,7 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKeyArn
+              KMSMasterKeyID: !Ref KmsKey
 
       Tags:
         - Key: Project
@@ -327,7 +333,7 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKeyArn
+              KMSMasterKeyID: !Ref KmsKey
 
       # Object Lock – COMPLIANCE mode, 7 years (2555 days)
       ObjectLockEnabled: true
@@ -403,7 +409,7 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKeyArn
+              KMSMasterKeyID: !Ref KmsKey
 
       # Expire non-current versions after 30 days to control storage cost
       LifecycleConfiguration:
@@ -452,7 +458,7 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKeyArn
+              KMSMasterKeyID: !Ref KmsKey
 
       # Delete Athena results after 7 days 
       LifecycleConfiguration:
