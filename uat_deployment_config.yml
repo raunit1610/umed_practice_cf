@@ -2,4 +2,3 @@ template-file-path: ./umed_s3_buckets_cf_script.yml
 
 parameters:
   Environment: uatil
-  EnableProdServerLogging: "false"

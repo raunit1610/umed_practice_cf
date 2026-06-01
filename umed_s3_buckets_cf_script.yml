@@ -23,24 +23,24 @@ Parameters:
   #     Create one KMS key per environment (e.g. alias/umed-dev, alias/umed-prod)
   #     and supply its ARN here.
 
-  EnableProdServerLogging:
-    Type: String
-    AllowedValues: ["true", "false"]
-    Default: "false"
-    Description: >
-      Set to true for prod. Enables server access logging on Raw, Staging,
-      Intermediate, and DW buckets. Logs are written to the Audit bucket.
-      The Audit bucket itself relies on CloudTrail Data Events instead of
-      server access logging, removing the need for a separate log bucket.
+  # EnableProdServerLogging:
+  #   Type: String
+  #   AllowedValues: ["true", "false"]
+  #   Default: "false"
+  #   Description: >
+  #     Set to true for prod. Enables server access logging on Raw, Staging,
+  #     Intermediate, and DW buckets. Logs are written to the Audit bucket.
+  #     The Audit bucket itself relies on CloudTrail Data Events instead of
+  #     server access logging, removing the need for a separate log bucket.
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Conditions
 # ──────────────────────────────────────────────────────────────────────────────
 Conditions:
 
-  IsProd: !Equals [!Ref Environment, prod]
+  IsProd: !Equals [!Ref Environment, prodil]
 
-  EnableDataBucketLogging: !Equals [!Ref EnableProdServerLogging, "true"]
+  # EnableDataBucketLogging: !Equals [!Ref EnableProdServerLogging, "true"]
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Resources
@@ -116,7 +116,7 @@ Resources:
 
       # Server access logging 
       LoggingConfiguration: !If
-        - EnableDataBucketLogging
+        - IsProd
         - DestinationBucketName: !Ref AuditBucket
           LogFilePrefix: !Sub "server-access-logs/raw-${Environment}/"
         - !Ref AWS::NoValue
@@ -163,7 +163,7 @@ Resources:
               KMSMasterKeyID: !Ref KmsKey
 
       LoggingConfiguration: !If
-        - EnableDataBucketLogging
+        - IsProd
         - DestinationBucketName: !Ref AuditBucket
           LogFilePrefix: !Sub "server-access-logs/staging-${Environment}/"
         - !Ref AWS::NoValue
@@ -210,7 +210,7 @@ Resources:
               KMSMasterKeyID: !Ref KmsKey
 
       LoggingConfiguration: !If
-        - EnableDataBucketLogging
+        - IsProd
         - DestinationBucketName: !Ref AuditBucket
           LogFilePrefix: !Sub "server-access-logs/intermediate-${Environment}/"
         - !Ref AWS::NoValue
@@ -257,7 +257,7 @@ Resources:
               KMSMasterKeyID: !Ref KmsKey
 
       LoggingConfiguration: !If
-        - EnableDataBucketLogging
+        - IsProd
         - DestinationBucketName: !Ref AuditBucket
           LogFilePrefix: !Sub "server-access-logs/dw-${Environment}/"
         - !Ref AWS::NoValue
