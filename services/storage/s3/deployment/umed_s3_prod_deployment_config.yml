@@ -1,0 +1,4 @@
+template-file-path: ./umed_s3_template.yml
+
+parameters:
+  Environment: prodil
