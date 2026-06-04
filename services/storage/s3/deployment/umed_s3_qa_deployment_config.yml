@@ -1,4 +1,4 @@
-template-file-path: ./umed_s3_template.yml
+template-file-path: services/storage/s3/templates/umed_s3_template.yml
 
 parameters:
   Environment: qail
