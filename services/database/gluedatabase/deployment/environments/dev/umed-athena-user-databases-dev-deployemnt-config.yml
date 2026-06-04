@@ -1,0 +1,6 @@
+template-file-path: services/database/gluedatabase/templates/athena-user-databases.yml
+
+parameters:
+  UserName: 'raunit'
+  Environment: devil
+

@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: UMED Shared Athena Environment Resources
+
+Parameters:
+
+  Environment:
+    Type: String
+
+    AllowedValues:
+      - devil
+      - qa
+      - uat
+      - prod
+
+Resources:
+
+  AthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Sub umed-${Environment}-wg
+
+      Description: UMED Athena WorkGroup
+
+      RecursiveDeleteOption: true
+
+      State: ENABLED
+
+      WorkGroupConfiguration:
+
+        PublishCloudWatchMetricsEnabled: true
+
+        ResultConfiguration:
+
+          OutputLocation: !Sub
+            s3://umed-athena-results-${Environment}/
+
+  AuditDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: !Sub umed_audit_${Environment}_db
+
+        Description: Shared Audit Database
+
+Outputs:
+
+  AthenaWorkGroup:
+    Value: !Ref AthenaWorkGroup
+
+  AuditDatabase:
+    Value: !Sub umed_ehr_audit_${Environment}_db

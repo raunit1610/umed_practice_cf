@@ -1,0 +1,5 @@
+template-file-path: services/utils/athena/templates/umed-athena-environment.yml
+
+parameters:
+  Environment: devil
+
