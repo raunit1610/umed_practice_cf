@@ -1,5 +1,10 @@
-template-file-path: ./umed_s3_buckets_cf_script.yml
+AWSTemplateFormatVersion: '2010-09-09'
 
-parameters:
-  Environment: devil
+Resources:
 
+  S3Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      template-file-path: ./umed_s3_buckets_cf_script.yml
+      Parameters:
+        Environment: devil
