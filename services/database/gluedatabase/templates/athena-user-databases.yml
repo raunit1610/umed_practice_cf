@@ -30,7 +30,7 @@ Resources:
 
         Name: !Sub umed_raw_ehr_${UserName}_${Environment}_db
 
-        Description: "[DEV] Raw ingestion landing zone for healthcare FHIR (Fast Healthcare Interoperability Resources) data. This database stores unprocessed FHIR resources as received from source systems. Data is ingested in its original format without transformation or enrichment, preserving full fidelity for downstream ETL pipelines."
+        Description: !Sub "[${Environment}] Raw ingestion landing zone for healthcare FHIR (Fast Healthcare Interoperability Resources) data. This database stores unprocessed FHIR resources as received from source systems. Data is ingested in its original format without transformation or enrichment, preserving full fidelity for downstream ETL pipelines."
 
   StgDatabase:
     Type: AWS::Glue::Database
@@ -42,7 +42,7 @@ Resources:
 
         Name: !Sub umed_stg_ehr_${UserName}_${Environment}_db
 
-        Description: "[DEV] Staging layer database for healthcare FHIR (Fast Healthcare Interoperability Resources) data. This database serves as the processing layer where raw FHIR resources are flattened from their nested JSON structures and normalized into structured, relational formats."
+        Description: !Sub "[${Environment}] Staging layer database for healthcare FHIR (Fast Healthcare Interoperability Resources) data. This database serves as the processing layer where raw FHIR resources are flattened from their nested JSON structures and normalized into structured, relational formats."
 
   IntDatabase:
     Type: AWS::Glue::Database
@@ -54,7 +54,7 @@ Resources:
 
         Name: !Sub umed_int_ehr_${UserName}_${Environment}_db
 
-        Description: "[DEV] Intermediate processing layer for transformed and business-logic-applied datasets.Data at this layer has been standardized, validated, and shaped according to business rules, making it ready for reporting, analytics, and further aggregation."
+        Description: !Sub "[${Environment}] Intermediate processing layer for transformed and business-logic-applied datasets.Data at this layer has been standardized, validated, and shaped according to business rules, making it ready for reporting, analytics, and further aggregation."
 
   DwDatabase:
     Type: AWS::Glue::Database
@@ -66,7 +66,7 @@ Resources:
 
         Name: !Sub umed_dw_ehr_${UserName}_${Environment}_db
 
-        Description: "[DEV] Data warehouse layer housing curated, analytics-ready datasets optimized for reporting, business intelligence, and data consumption. This database stores fully transformed, validated, and business-rule-applied data structured for high-performance querying and analysis. Data at this layer represents a single source of truth, aggregated and modeled to support dashboards, self-service analytics, and strategic decision-making across the organization."
+        Description: !Sub "[${Environment}] Data warehouse layer housing curated, analytics-ready datasets optimized for reporting, business intelligence, and data consumption. This database stores fully transformed, validated, and business-rule-applied data structured for high-performance querying and analysis. Data at this layer represents a single source of truth, aggregated and modeled to support dashboards, self-service analytics, and strategic decision-making across the organization."
 
   AnalyticsDatabase:
     Type: AWS::Glue::Database
@@ -78,7 +78,7 @@ Resources:
 
         Name: !Sub umed_analytics_ehr_${UserName}_${Environment}_db
 
-        Description: "[DEV] Analytics layer housing pre-built reporting datasets optimized for business intelligence and data visualization. This database stores aggregated, denormalized, and presentation-ready data derived from the data warehouse layer, tailored to meet the specific needs of reports, dashboards, and end-user consumption. Data at this layer is structured for simplicity and performance, enabling fast, consistent, and reliable insights across business domains."
+        Description: !Sub "[${Environment}] Analytics layer housing pre-built reporting datasets optimized for business intelligence and data visualization. This database stores aggregated, denormalized, and presentation-ready data derived from the data warehouse layer, tailored to meet the specific needs of reports, dashboards, and end-user consumption. Data at this layer is structured for simplicity and performance, enabling fast, consistent, and reliable insights across business domains."
 
 Outputs:
 
