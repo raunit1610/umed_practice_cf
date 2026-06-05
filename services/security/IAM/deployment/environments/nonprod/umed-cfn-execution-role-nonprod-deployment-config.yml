@@ -1,0 +1,6 @@
+template-file-path: services/security/IAM/templates/umed-cfn-execution-role.yml
+
+parameters:
+  Name: prac-cfn
+  Service: cloudformation
+

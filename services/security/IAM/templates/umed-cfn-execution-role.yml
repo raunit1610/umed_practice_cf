@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation Execution Role
+
+Parameters:
+  Name:
+    Type: String
+    
+  Service:
+    Type: String
+
+Resources:
+
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "umed-${Name}-execution-role"
+
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !Sub "${Service}.amazonaws.com"
+            Action:
+              - sts:AssumeRole
+
+Outputs:
+  RoleArn:
+    Value: !GetAtt CloudFormationExecutionRole.Arn
+
+  RoleName:
+    Value: !Ref CloudFormationExecutionRole
