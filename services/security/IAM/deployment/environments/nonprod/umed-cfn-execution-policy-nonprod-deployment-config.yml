@@ -1,6 +1,6 @@
 template-file-path: services/security/IAM/templates/umed-cfn-execution-policy.yml
 
 parameters:
-  Name: prac-cfn
-  ExecutionRoleName: umed-prac-cfn-execution-role
+  Name: cfn
+  ExecutionRoleName: umed-cfn-execution-role
 
