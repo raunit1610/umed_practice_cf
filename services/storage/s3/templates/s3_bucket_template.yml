@@ -50,7 +50,7 @@ Resources:
   KmsAlias:
     Type: AWS::KMS::Alias
     Properties:
-      AliasName: !Sub "alias/umed-${Environment}-s3"
+      AliasName: !Sub "alias/umed-${Environment}-s3-key"
       TargetKeyId: !Ref KmsKey
 
   # ============================================================
