@@ -2,25 +2,39 @@ AWSTemplateFormatVersion: '2010-09-09'
 
 Description: UMED Shared Athena Environment Resources
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Parameters
+# ──────────────────────────────────────────────────────────────────────────────
 Parameters:
 
-  Environment:
+  Account:
     Type: String
+    AllowedValues: [nonprod, prodil]
+  
+# ──────────────────────────────────────────────────────────────────────────────
+# Conditions
+# ──────────────────────────────────────────────────────────────────────────────
+Conditions:
 
-    AllowedValues:
-      - devil
-      - qa
-      - uat
-      - prod
+  IsProd: !Equals [!Ref Account, prodil]
 
+  IsNonProd: !Not
+    - !Condition IsProd
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Resources
+# ──────────────────────────────────────────────────────────────────────────────
 Resources:
-
-  AthenaWorkGroup:
+# ──────────────────────────────────────────────────────────────────────────────
+# Athena WorkGroups
+# ──────────────────────────────────────────────────────────────────────────────
+  ProdAthenaWorkGroup:
     Type: AWS::Athena::WorkGroup
+    Condition: IsProd
     Properties:
-      Name: !Sub umed-${Environment}-wg
+      Name: umed-prod-wg
 
-      Description: UMED Athena WorkGroup
+      Description: UMED Athena Prod WorkGroup
 
       RecursiveDeleteOption: true
 
@@ -32,25 +46,434 @@ Resources:
 
         ResultConfiguration:
 
-          OutputLocation: !Sub
-            s3://umed-athena-results-${Environment}/
+          OutputLocation: s3://umed-athena-results-prod/
 
-  AuditDatabase:
+
+  DevAthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Condition: IsNonProd
+    Properties:
+      Name: umed-dev-wg
+
+      Description: UMED Athena Dev WorkGroup
+
+      RecursiveDeleteOption: true
+
+      State: ENABLED
+
+      WorkGroupConfiguration:
+
+        PublishCloudWatchMetricsEnabled: true
+
+        ResultConfiguration:
+
+          OutputLocation: s3://umed-athena-results-dev/
+
+
+  QaAthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Condition: IsNonProd
+    Properties:
+      Name: umed-qa-wg
+
+      Description: UMED Athena Qa WorkGroup
+
+      RecursiveDeleteOption: true
+
+      State: ENABLED
+
+      WorkGroupConfiguration:
+
+        PublishCloudWatchMetricsEnabled: true
+
+        ResultConfiguration:
+
+          OutputLocation: s3://umed-athena-results-qa/
+
+
+  UatAthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Condition: IsNonProd
+    Properties:
+      Name: umed-uat-wg
+
+      Description: UMED Athena Uat WorkGroup
+
+      RecursiveDeleteOption: true
+
+      State: ENABLED
+
+      WorkGroupConfiguration:
+
+        PublishCloudWatchMetricsEnabled: true
+
+        ResultConfiguration:
+
+          OutputLocation: s3://umed-athena-results-uat/
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Athena Users Glue Databases
+# ──────────────────────────────────────────────────────────────────────────────
+  ProdRawDatabase:
     Type: AWS::Glue::Database
+    Condition: IsProd
     Properties:
 
       CatalogId: !Ref AWS::AccountId
 
       DatabaseInput:
 
-        Name: !Sub umed_audit_${Environment}_db
+        Name: umed_raw_ehr_prod_db
 
-        Description: Shared Audit Database
+        Description: "[PROD] Raw ingestion landing zone for healthcare FHIR (Fast Healthcare Interoperability Resources) data. This database stores unprocessed FHIR resources as received from source systems. Data is ingested in its original format without transformation or enrichment, preserving full fidelity for downstream ETL pipelines."
+
+  DevFakruddinRawDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_raw_ehr_dev_fakruddin_db
+
+        Description: "[DEV] Raw ingestion landing zone for healthcare FHIR (Fast Healthcare Interoperability Resources) data. This database stores unprocessed FHIR resources as received from source systems. Data is ingested in its original format without transformation or enrichment, preserving full fidelity for downstream ETL pipelines."
+      
+  DevRaunitRawDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_raw_ehr_dev_raunit_db
+
+        Description: "[DEV] Raw ingestion landing zone for healthcare FHIR (Fast Healthcare Interoperability Resources) data. This database stores unprocessed FHIR resources as received from source systems. Data is ingested in its original format without transformation or enrichment, preserving full fidelity for downstream ETL pipelines."
+      
+  ProdStgDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_stg_ehr_prod_db
+
+        Description: "[PROD] Staging layer database for healthcare FHIR (Fast Healthcare Interoperability Resources) data. This database serves as the processing layer where raw FHIR resources are flattened from their nested JSON structures and normalized into structured, relational formats."
+
+  DevFakruddinStgDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_stg_ehr_dev_fakruddin_db
+
+        Description: "[DEV] Staging layer database for healthcare FHIR (Fast Healthcare Interoperability Resources) data. This database serves as the processing layer where raw FHIR resources are flattened from their nested JSON structures and normalized into structured, relational formats."
+      
+  DevRaunitStgDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_stg_ehr_dev_raunit_db
+
+        Description: "[DEV] Staging layer database for healthcare FHIR (Fast Healthcare Interoperability Resources) data. This database serves as the processing layer where raw FHIR resources are flattened from their nested JSON structures and normalized into structured, relational formats."
+  
+  ProdIntDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_int_ehr_prod_db
+
+        Description: "[PROD] Intermediate processing layer for transformed and business-logic-applied datasets.Data at this layer has been standardized, validated, and shaped according to business rules, making it ready for reporting, analytics, and further aggregation."
+  
+  DevFakruddinIntDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_int_ehr_dev_fakruddin_db
+
+        Description: "[DEV] Intermediate processing layer for transformed and business-logic-applied datasets.Data at this layer has been standardized, validated, and shaped according to business rules, making it ready for reporting, analytics, and further aggregation."
+      
+  DevRaunitIntDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_int_ehr_dev_raunit_db
+
+        Description: "[DEV] Intermediate processing layer for transformed and business-logic-applied datasets.Data at this layer has been standardized, validated, and shaped according to business rules, making it ready for reporting, analytics, and further aggregation."
+  
+  ProdDwDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_dw_ehr_prod_db
+
+        Description: "[PROD] Data warehouse layer housing curated, analytics-ready datasets optimized for reporting, business intelligence, and data consumption. This database stores fully transformed, validated, and business-rule-applied data structured for high-performance querying and analysis. Data at this layer represents a single source of truth, aggregated and modeled to support dashboards, self-service analytics, and strategic decision-making across the organization."
+  
+  DevFakruddinDwDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_dw_ehr_dev_fakruddin_db
+
+        Description: "[DEV] Data warehouse layer housing curated, analytics-ready datasets optimized for reporting, business intelligence, and data consumption. This database stores fully transformed, validated, and business-rule-applied data structured for high-performance querying and analysis. Data at this layer represents a single source of truth, aggregated and modeled to support dashboards, self-service analytics, and strategic decision-making across the organization."
+      
+  DevRaunitDwDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_dw_ehr_dev_raunit_db
+
+        Description: "[DEV] Data warehouse layer housing curated, analytics-ready datasets optimized for reporting, business intelligence, and data consumption. This database stores fully transformed, validated, and business-rule-applied data structured for high-performance querying and analysis. Data at this layer represents a single source of truth, aggregated and modeled to support dashboards, self-service analytics, and strategic decision-making across the organization."
+
+  ProdAnalyticsDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_analytics_ehr_prod_db
+
+        Description: "[PROD] Analytics layer housing pre-built reporting datasets optimized for business intelligence and data visualization. This database stores aggregated, denormalized, and presentation-ready data derived from the data warehouse layer, tailored to meet the specific needs of reports, dashboards, and end-user consumption. Data at this layer is structured for simplicity and performance, enabling fast, consistent, and reliable insights across business domains."
+  
+  DevFakruddinAnalyticsDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_analytics_ehr_dev_fakruddin_db
+
+        Description: "[DEV] Analytics layer housing pre-built reporting datasets optimized for business intelligence and data visualization. This database stores aggregated, denormalized, and presentation-ready data derived from the data warehouse layer, tailored to meet the specific needs of reports, dashboards, and end-user consumption. Data at this layer is structured for simplicity and performance, enabling fast, consistent, and reliable insights across business domains."
+  
+  DevRaunitAnalyticsDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_analytics_ehr_dev_raunit_db
+
+        Description: "[DEV] Analytics layer housing pre-built reporting datasets optimized for business intelligence and data visualization. This database stores aggregated, denormalized, and presentation-ready data derived from the data warehouse layer, tailored to meet the specific needs of reports, dashboards, and end-user consumption. Data at this layer is structured for simplicity and performance, enabling fast, consistent, and reliable insights across business domains."
+  
+  ProdAuditDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_audit_prod_db
+
+        Description: "[PROD] Audit Database"
+  
+  DevAuditDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_audit_dev_db
+
+        Description: "[DEV] Audit Database"
+        
+  QaAuditDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_audit_qa_db
+
+        Description: "[QA] Audit Database"
+
+  UatAuditDatabase:
+    Type: AWS::Glue::Database
+    Condition: IsNonProd
+    Properties:
+
+      CatalogId: !Ref AWS::AccountId
+
+      DatabaseInput:
+
+        Name: umed_audit_uat_db
+
+        Description: "[UAT] Audit Database"
 
 Outputs:
 
-  AthenaWorkGroup:
-    Value: !Ref AthenaWorkGroup
+  # =====================================================
+  # PROD OUTPUTS
+  # =====================================================
 
-  AuditDatabase:
-    Value: !Sub umed_ehr_audit_${Environment}_db
+  ProdAthenaWorkGroupName:
+    Condition: IsProd
+    Description: Production Athena WorkGroup
+    Value: !Ref ProdAthenaWorkGroup
+
+  ProdRawDatabaseName:
+    Condition: IsProd
+    Value: umed_raw_ehr_prod_db
+
+  ProdStgDatabaseName:
+    Condition: IsProd
+    Value: umed_stg_ehr_prod_db
+
+  ProdIntDatabaseName:
+    Condition: IsProd
+    Value: umed_int_ehr_prod_db
+
+  ProdDwDatabaseName:
+    Condition: IsProd
+    Value: umed_dw_ehr_prod_db
+
+  ProdAnalyticsDatabaseName:
+    Condition: IsProd
+    Value: umed_analytics_ehr_prod_db
+
+  ProdAuditDatabaseName:
+    Condition: IsProd
+    Value: umed_audit_prod_db
+
+
+  # =====================================================
+  # DEV OUTPUTS
+  # =====================================================
+
+  DevAthenaWorkGroupName:
+    Condition: IsNonProd
+    Description: Development Athena WorkGroup
+    Value: !Ref DevAthenaWorkGroup
+
+  DevFakruddinRawDatabaseName:
+    Condition: IsNonProd
+    Value: umed_raw_ehr_dev_fakruddin_db
+
+  DevRaunitRawDatabaseName:
+    Condition: IsNonProd
+    Value: umed_raw_ehr_dev_raunit_db
+
+  DevFakruddinStgDatabaseName:
+    Condition: IsNonProd
+    Value: umed_stg_ehr_dev_fakruddin_db
+
+  DevRaunitStgDatabaseName:
+    Condition: IsNonProd
+    Value: umed_stg_ehr_dev_raunit_db
+
+  DevFakruddinIntDatabaseName:
+    Condition: IsNonProd
+    Value: umed_int_ehr_dev_fakruddin_db
+
+  DevRaunitIntDatabaseName:
+    Condition: IsNonProd
+    Value: umed_int_ehr_dev_raunit_db
+
+  DevFakruddinDwDatabaseName:
+    Condition: IsNonProd
+    Value: umed_dw_ehr_dev_fakruddin_db
+
+  DevRaunitDwDatabaseName:
+    Condition: IsNonProd
+    Value: umed_dw_ehr_dev_raunit_db
+
+  DevFakruddinAnalyticsDatabaseName:
+    Condition: IsNonProd
+    Value: umed_analytics_ehr_dev_fakruddin_db
+
+  DevRaunitAnalyticsDatabaseName:
+    Condition: IsNonProd
+    Value: umed_analytics_ehr_dev_raunit_db
+
+  DevAuditDatabaseName:
+    Condition: IsNonProd
+    Value: umed_audit_dev_db
+
+
+  # =====================================================
+  # QA OUTPUTS
+  # =====================================================
+
+  QaAthenaWorkGroupName:
+    Condition: IsNonProd
+    Description: QA Athena WorkGroup
+    Value: !Ref QaAthenaWorkGroup
+
+  QaAuditDatabaseName:
+    Condition: IsNonProd
+    Value: umed_audit_qa_db
+
+
+  # =====================================================
+  # UAT OUTPUTS
+  # =====================================================
+
+  UatAthenaWorkGroupName:
+    Condition: IsNonProd
+    Description: UAT Athena WorkGroup
+    Value: !Ref UatAthenaWorkGroup
+
+  UatAuditDatabaseName:
+    Condition: IsNonProd
+    Value: umed_audit_uat_db
