@@ -1,17 +1,28 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Description: CloudFormation Execution Policy for UMED Platform
 
 Parameters:
 
   Name:
     Type: String
-    Description: Environment or platform identifier
-
-  ExecutionRoleName:
-    Type: String
-    Description: Existing IAM Role to attach the policy to
+    Default: "cfn"
+    Description: Environment or platform identifier for this role and policy
 
 Resources:
+
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "umed-${Name}-execution-role"
+
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action:
+              - sts:AssumeRole
 
   CloudFormationExecutionPolicy:
     Type: AWS::IAM::ManagedPolicy
@@ -19,7 +30,7 @@ Resources:
       ManagedPolicyName: !Sub "umed-${Name}-execution-policy"
 
       Roles:
-        - !Ref ExecutionRoleName
+        - !Ref CloudFormationExecutionRole
 
       PolicyDocument:
         Version: "2012-10-17"
@@ -143,6 +154,10 @@ Resources:
             Resource: "*"
 
 Outputs:
+
+  ExecutionRoleArn:
+    Description: CloudFormation Execution Role ARN
+    Value: !GetAtt CloudFormationExecutionRole.Arn
 
   ManagedPolicyArn:
     Description: Managed Policy ARN
