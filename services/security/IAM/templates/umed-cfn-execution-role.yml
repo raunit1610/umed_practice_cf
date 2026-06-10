@@ -1,12 +1,12 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation Execution Role
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation Execution Policy for UMED Platform
 
 Parameters:
+
   Name:
     Type: String
-    
-  Service:
-    Type: String
+    Default: "cfn"
+    Description: Environment or platform identifier for this role and policy
 
 Resources:
 
@@ -20,14 +20,145 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service:
-                - !Sub "${Service}.amazonaws.com"
+              Service: cloudformation.amazonaws.com
             Action:
               - sts:AssumeRole
 
+  CloudFormationExecutionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "umed-${Name}-execution-policy"
+
+      Roles:
+        - !Ref CloudFormationExecutionRole
+
+      PolicyDocument:
+        Version: "2012-10-17"
+
+        Statement:
+
+          # =====================================================
+          # S3 MANAGEMENT
+          # =====================================================
+          - Sid: S3BucketManagement
+            Effect: Allow
+            Action:
+              - s3:CreateBucket
+              - s3:DeleteBucket
+              - s3:ListBucket
+              - s3:GetBucketLocation
+              - s3:GetBucketPolicy
+              - s3:PutBucketPolicy
+              - s3:DeleteBucketPolicy
+              - s3:GetBucketTagging
+              - s3:PutBucketTagging
+              - s3:GetBucketVersioning
+              - s3:PutBucketVersioning
+              - s3:GetEncryptionConfiguration
+              - s3:PutEncryptionConfiguration
+              - s3:GetBucketPublicAccessBlock
+              - s3:PutBucketPublicAccessBlock
+              - s3:GetLifecycleConfiguration
+              - s3:PutLifecycleConfiguration
+              - s3:GetBucketLogging
+              - s3:PutBucketLogging
+              - s3:GetBucketAcl
+              - s3:PutBucketAcl
+              - s3:GetBucketOwnershipControls
+              - s3:PutBucketOwnershipControls
+              - s3:GetBucketObjectLockConfiguration
+              - s3:PutBucketObjectLockConfiguration
+            Resource: "*"
+
+          # =====================================================
+          # KMS MANAGEMENT
+          # =====================================================
+          - Sid: KMSManagement
+            Effect: Allow
+            Action:
+              - kms:CreateKey
+              - kms:ScheduleKeyDeletion
+              - kms:CancelKeyDeletion
+              - kms:DescribeKey
+              - kms:CreateAlias
+              - kms:DeleteAlias
+              - kms:UpdateAlias
+              - kms:PutKeyPolicy
+              - kms:GetKeyPolicy
+              - kms:EnableKeyRotation
+              - kms:CreateGrant
+              - kms:RetireGrant
+              - kms:GenerateDataKey
+              - kms:Encrypt
+              - kms:Decrypt
+            Resource: "*"
+
+          # =====================================================
+          # ATHENA MANAGEMENT
+          # =====================================================
+          - Sid: AthenaWorkgroupManagement
+            Effect: Allow
+            Action:
+              - athena:CreateWorkGroup
+              - athena:UpdateWorkGroup
+              - athena:DeleteWorkGroup
+              - athena:GetWorkGroup
+              - athena:ListWorkGroups
+              - athena:TagResource
+              - athena:UntagResource
+            Resource: "*"
+
+          # =====================================================
+          # GLUE DATABASE MANAGEMENT
+          # =====================================================
+          - Sid: GlueDatabaseManagement
+            Effect: Allow
+            Action:
+              - glue:CreateDatabase
+              - glue:UpdateDatabase
+              - glue:DeleteDatabase
+              - glue:GetDatabase
+              - glue:GetDatabases
+            Resource: "*"
+
+          # =====================================================
+          # GLUE TABLE MANAGEMENT
+          # =====================================================
+          - Sid: GlueTableManagement
+            Effect: Allow
+            Action:
+              - glue:CreateTable
+              - glue:UpdateTable
+              - glue:DeleteTable
+              - glue:GetTable
+              - glue:GetTables
+              - glue:BatchCreatePartition
+              - glue:BatchDeletePartition
+              - glue:BatchUpdatePartition
+              - glue:GetPartition
+              - glue:GetPartitions
+            Resource: "*"
+
+          # =====================================================
+          # GLUE DATA CATALOG
+          # =====================================================
+          - Sid: GlueCatalogManagement
+            Effect: Allow
+            Action:
+              - glue:GetCatalogImportStatus
+              - glue:GetDataCatalogEncryptionSettings
+              - glue:PutDataCatalogEncryptionSettings
+              - glue:GetResourcePolicy
+              - glue:PutResourcePolicy
+              - glue:DeleteResourcePolicy
+            Resource: "*"
+
 Outputs:
-  RoleArn:
+
+  ExecutionRoleArn:
+    Description: CloudFormation Execution Role ARN
     Value: !GetAtt CloudFormationExecutionRole.Arn
 
-  RoleName:
-    Value: !Ref CloudFormationExecutionRole
+  ManagedPolicyArn:
+    Description: Managed Policy ARN
+    Value: !Ref CloudFormationExecutionPolicy

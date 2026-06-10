@@ -1,6 +1,5 @@
 template-file-path: services/security/IAM/templates/umed-cfn-execution-role.yml
 
 parameters:
-  Name: cfn
-  Service: cloudformation
+  Name: practice12345-cfn
 
