@@ -1,5 +1,5 @@
 template-file-path: services/utils/athena/templates/athena-environment.yml
 
 parameters:
-  Environment: devil
+  Account: nonprod
 
