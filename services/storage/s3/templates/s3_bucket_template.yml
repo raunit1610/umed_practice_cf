@@ -3,7 +3,7 @@ Description: >
   uMed EHR Data Platform: S3 Bucket Stack
   Creates all eight S3 buckets (Raw, Staging, Intermediate, Data Warehouse,
   Analytics, Audit, Control, Athena Results) for a single environment with
-  full HIPAA-compliant configuration. Deploy once per environment (dev/qa/uat/prod)
+  full HIPAA-compliant configuration. Deploy once per environment (nonprod/prod)
   supplying the environment name and KMS CMK ARN.
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -11,9 +11,9 @@ Description: >
 # ──────────────────────────────────────────────────────────────────────────────
 Parameters:
 
-  Environment:
+  Account:
     Type: String
-    AllowedValues: [devil, qail, uatil, prodil]
+    AllowedValues: [nonprod, prodil]
     Description: Deployment environment. Controls bucket naming and prod-only features.
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -21,21 +21,24 @@ Parameters:
 # ──────────────────────────────────────────────────────────────────────────────
 Conditions:
 
-  IsProd: !Equals [!Ref Environment, prodil]
+  IsProd: !Equals [!Ref Account, prodil]
+
+  IsNonProd: !Not
+    - !Condition IsProd
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Resources
 # ──────────────────────────────────────────────────────────────────────────────
 Resources:
-
-  # =====================================================
+# =====================================================
 # KMS KEY
 # =====================================================
-
-  KmsKey:
+  ProdKmsKey:
     Type: AWS::KMS::Key
+    Condition: IsProd
     Properties:
-      Description: !Sub "uMed ${Environment} S3 Encryption Key"
+      Description: "uMed Prod S3 Encryption Key"
       EnableKeyRotation: true
       KeyPolicy:
         Version: "2012-10-17"
@@ -54,22 +57,128 @@ Resources:
             Action:
               - kms:GenerateDataKey*
               - kms:DescribeKey
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+            Resource: "*"
+  ProdKmsAlias:
+    Type: AWS::KMS::Alias
+    Condition: IsProd
+    Properties:
+      AliasName: alias/umed-data-platform-prod-s3-key
+      TargetKeyId: !Ref ProdKmsKey
+
+  DevKmsKey:
+    Type: AWS::KMS::Key
+    Condition: IsNonProd
+    Properties:
+      Description: "uMed Dev S3 Encryption Key"
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowRootAccount
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: "kms:*"
             Resource: "*"
 
-  KmsAlias:
+          - Sid: AllowCloudTrailToEncryptLogs
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action:
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+            Resource: "*"
+  DevKmsAlias:
     Type: AWS::KMS::Alias
+    Condition: IsNonProd
     Properties:
-      AliasName: !Sub "alias/umed-${Environment}-s3-key"
-      TargetKeyId: !Ref KmsKey
+      AliasName: alias/umed-data-platform-dev-s3-key
+      TargetKeyId: !Ref DevKmsKey
+
+  QaKmsKey:
+    Type: AWS::KMS::Key
+    Condition: IsNonProd
+    Properties:
+      Description: "uMed QA S3 Encryption Key"
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowRootAccount
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: "kms:*"
+            Resource: "*"
+
+          - Sid: AllowCloudTrailToEncryptLogs
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action:
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+            Resource: "*"
+  QaKmsAlias:
+    Type: AWS::KMS::Alias
+    Condition: IsNonProd
+    Properties:
+      AliasName: alias/umed-data-platform-qa-s3-key
+      TargetKeyId: !Ref QaKmsKey
+
+  UatKmsKey:
+    Type: AWS::KMS::Key
+    Condition: IsNonProd
+    Properties:
+      Description: "uMed UAT S3 Encryption Key"
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowRootAccount
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: "kms:*"
+            Resource: "*"
+
+          - Sid: AllowCloudTrailToEncryptLogs
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action:
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+            Resource: "*"
+  UatKmsAlias:
+    Type: AWS::KMS::Alias
+    Condition: IsNonProd
+    Properties:
+      AliasName: alias/umed-data-platform-uat-s3-key
+      TargetKeyId: !Ref UatKmsKey
 
   # ============================================================
   # 1. RAW BUCKET  –  umed-raw-ehr-{env}
   # Stores: original FHIR NDJSON records  (immutable source)
   # ============================================================
-  RawBucket:
+  ProdRawBucket:
     Type: AWS::S3::Bucket
+    Condition: IsProd 
     Properties:
-      BucketName: !Sub "umed-raw-ehr-${Environment}"
+      BucketName: "umed-raw-ehr-prod"
 
       # Block all public access 
       PublicAccessBlockConfiguration:
@@ -93,7 +202,7 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKey
+              KMSMasterKeyID: !Ref ProdKmsKey
 
       # Lifecycle – transition to Glacier Instant Retrieval after 90 days
       LifecycleConfiguration:
@@ -105,11 +214,9 @@ Resources:
                 TransitionInDays: 90
 
       # Server access logging 
-      LoggingConfiguration: !If
-        - IsProd
-        - DestinationBucketName: !Ref AuditBucket
-          LogFilePrefix: !Sub "server-access-logs/raw-${Environment}/"
-        - !Ref AWS::NoValue
+      LoggingConfiguration: 
+        DestinationBucketName: !Ref ProdAuditBucket
+        LogFilePrefix: "server-access-logs/raw-prod/"
 
       Tags:
         - Key: Project
@@ -117,20 +224,178 @@ Resources:
         - Key: Layer
           Value: raw
         - Key: Environment
-          Value: !Ref Environment
+          Value: PROD
         - Key: DataClass
           Value: PHI
         - Key: Owner
           Value: data-engineering@uMed.com
 
+
+  DevRawBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd 
+    Properties:
+      BucketName: "umed-raw-ehr-dev"
+
+      # Block all public access 
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      # Object ownership 
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning disabled 
+      VersioningConfiguration:
+        Status: Suspended
+
+      # SSE-KMS with Customer Managed Key + Bucket Key 
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref DevKmsKey
+
+      # Lifecycle – transition to Glacier Instant Retrieval after 90 days
+      LifecycleConfiguration:
+        Rules:
+          - Id: RawToGlacierIR
+            Status: Enabled
+            Transitions:
+              - StorageClass: GLACIER_IR
+                TransitionInDays: 90
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: raw
+        - Key: Environment
+          Value: DEV
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  QaRawBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd 
+    Properties:
+      BucketName: "umed-raw-ehr-qa"
+
+      # Block all public access 
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      # Object ownership 
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning disabled 
+      VersioningConfiguration:
+        Status: Suspended
+
+      # SSE-KMS with Customer Managed Key + Bucket Key 
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref QaKmsKey
+
+      # Lifecycle – transition to Glacier Instant Retrieval after 90 days
+      LifecycleConfiguration:
+        Rules:
+          - Id: RawToGlacierIR
+            Status: Enabled
+            Transitions:
+              - StorageClass: GLACIER_IR
+                TransitionInDays: 90
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: raw
+        - Key: Environment
+          Value: QA
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  UatRawBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd 
+    Properties:
+      BucketName: "umed-raw-ehr-uat"
+
+      # Block all public access 
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      # Object ownership 
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning disabled 
+      VersioningConfiguration:
+        Status: Suspended
+
+      # SSE-KMS with Customer Managed Key + Bucket Key 
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref UatKmsKey
+
+      # Lifecycle – transition to Glacier Instant Retrieval after 90 days
+      LifecycleConfiguration:
+        Rules:
+          - Id: RawToGlacierIR
+            Status: Enabled
+            Transitions:
+              - StorageClass: GLACIER_IR
+                TransitionInDays: 90
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: raw
+        - Key: Environment
+          Value: UAT
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
   # ============================================================
   # 2. STAGING BUCKET  –  umed-stg-ehr-{env}
   # Stores: normalized and flattened FHIR data 
   # ============================================================
-  StagingBucket:
+  ProdStagingBucket:
     Type: AWS::S3::Bucket
+    Condition: IsProd
     Properties:
-      BucketName: !Sub "umed-stg-ehr-${Environment}"
+      BucketName: "umed-stg-ehr-prod"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -150,13 +415,11 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKey
+              KMSMasterKeyID: !Ref ProdKmsKey
 
-      LoggingConfiguration: !If
-        - IsProd
-        - DestinationBucketName: !Ref AuditBucket
-          LogFilePrefix: !Sub "server-access-logs/staging-${Environment}/"
-        - !Ref AWS::NoValue
+      LoggingConfiguration:
+        DestinationBucketName: !Ref ProdAuditBucket
+        LogFilePrefix: "server-access-logs/staging-prod/"
 
       Tags:
         - Key: Project
@@ -164,20 +427,18 @@ Resources:
         - Key: Layer
           Value: staging
         - Key: Environment
-          Value: !Ref Environment
+          Value: PROD
         - Key: DataClass
           Value: PHI
         - Key: Owner
           Value: data-engineering@uMed.com
 
-  # ============================================================
-  # 3. INTERMEDIATE BUCKET  –  umed-int-ehr-{env}
-  # Stores: buisness specific datasets 
-  # ============================================================
-  IntermediateBucket:
+
+  DevStagingBucket:
     Type: AWS::S3::Bucket
+    Condition: IsNonProd
     Properties:
-      BucketName: !Sub "umed-int-ehr-${Environment}"
+      BucketName: "umed-stg-ehr-dev"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -197,13 +458,132 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKey
+              KMSMasterKeyID: !Ref DevKmsKey
 
-      LoggingConfiguration: !If
-        - IsProd
-        - DestinationBucketName: !Ref AuditBucket
-          LogFilePrefix: !Sub "server-access-logs/intermediate-${Environment}/"
-        - !Ref AWS::NoValue
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: staging
+        - Key: Environment
+          Value: DEV
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  QaStagingBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-stg-ehr-qa"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref QaKmsKey
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: staging
+        - Key: Environment
+          Value: QA
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  UatStagingBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-stg-ehr-uat"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref UatKmsKey
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: staging
+        - Key: Environment
+          Value: UAT
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  # ============================================================
+  # 3. INTERMEDIATE BUCKET  –  umed-int-ehr-{env}
+  # Stores: buisness specific datasets 
+  # ============================================================
+  ProdIntermediateBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsProd
+    Properties:
+      BucketName: "umed-int-ehr-prod"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref ProdKmsKey
+
+      LoggingConfiguration:
+        DestinationBucketName: !Ref ProdAuditBucket
+        LogFilePrefix: "server-access-logs/intermediate-prod/"
 
       Tags:
         - Key: Project
@@ -211,20 +591,18 @@ Resources:
         - Key: Layer
           Value: intermediate
         - Key: Environment
-          Value: !Ref Environment
+          Value: PROD
         - Key: DataClass
           Value: PHI
         - Key: Owner
           Value: data-engineering@uMed.com
 
-  # ============================================================
-  # 4. DATA WAREHOUSE BUCKET  –  umed-dw-{env}
-  # Stores: final analytical tables 
-  # ============================================================
-  DataWarehouseBucket:
+
+  DevIntermediateBucket:
     Type: AWS::S3::Bucket
+    Condition: IsNonProd
     Properties:
-      BucketName: !Sub "umed-dw-${Environment}"
+      BucketName: "umed-int-ehr-dev"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -244,13 +622,132 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKey
+              KMSMasterKeyID: !Ref DevKmsKey
 
-      LoggingConfiguration: !If
-        - IsProd
-        - DestinationBucketName: !Ref AuditBucket
-          LogFilePrefix: !Sub "server-access-logs/dw-${Environment}/"
-        - !Ref AWS::NoValue
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: intermediate
+        - Key: Environment
+          Value: DEV
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  QaIntermediateBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-int-ehr-qa"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref QaKmsKey
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: intermediate
+        - Key: Environment
+          Value: QA
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  UatIntermediateBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-int-ehr-uat"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref UatKmsKey
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: intermediate
+        - Key: Environment
+          Value: UAT
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  # ============================================================
+  # 4. DATA WAREHOUSE BUCKET  –  umed-dw-{env}
+  # Stores: final analytical tables 
+  # ============================================================
+  ProdDataWarehouseBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsProd
+    Properties:
+      BucketName: "umed-dw-prod"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref ProdKmsKey
+
+      LoggingConfiguration:
+        DestinationBucketName: !Ref ProdAuditBucket
+        LogFilePrefix: "server-access-logs/dw-prod/"
 
       Tags:
         - Key: Project
@@ -258,7 +755,124 @@ Resources:
         - Key: Layer
           Value: dw
         - Key: Environment
-          Value: !Ref Environment
+          Value: PROD
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  DevDataWarehouseBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-dw-dev"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref DevKmsKey
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: dw
+        - Key: Environment
+          Value: DEV
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  QaDataWarehouseBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-dw-qa"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref QaKmsKey
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: dw
+        - Key: Environment
+          Value: QA
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  UatDataWarehouseBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-dw-uat"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref UatKmsKey
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: dw
+        - Key: Environment
+          Value: UAT
         - Key: DataClass
           Value: PHI
         - Key: Owner
@@ -268,10 +882,11 @@ Resources:
   # 5. ANALYTICS BUCKET  –  umed-analytics-{env}
   # Stores: pre-built reports and aggregated outputs
   # ============================================================
-  AnalyticsBucket:
+  ProdAnalyticsBucket:
     Type: AWS::S3::Bucket
+    Condition: IsProd
     Properties:
-      BucketName: !Sub "umed-analytics-${Environment}"
+      BucketName: "umed-analytics-prod"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -291,7 +906,11 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKey
+              KMSMasterKeyID: !Ref ProdKmsKey
+      
+      LoggingConfiguration:
+        DestinationBucketName: !Ref ProdAuditBucket
+        LogFilePrefix: "server-access-logs/analytics-prod/"
 
       Tags:
         - Key: Project
@@ -299,12 +918,128 @@ Resources:
         - Key: Layer
           Value: analytics
         - Key: Environment
-          Value: !Ref Environment
+          Value: PROD
         - Key: DataClass
           Value: PHI
         - Key: Owner
           Value: data-engineering@uMed.com
 
+
+  DevAnalyticsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-analytics-dev"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref DevKmsKey
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: analytics
+        - Key: Environment
+          Value: DEV
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  QaAnalyticsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-analytics-qa"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref QaKmsKey
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: analytics
+        - Key: Environment
+          Value: QA
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  UatAnalyticsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-analytics-uat"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref UatKmsKey
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: analytics
+        - Key: Environment
+          Value: UAT
+        - Key: DataClass
+          Value: PHI
+        - Key: Owner
+          Value: data-engineering@uMed.com
   # ============================================================
   # 6. AUDIT BUCKET  –  umed-audit-logs-{env}
   # Stores: HIPAA audit trail, file-level and table-level audit records
@@ -318,10 +1053,11 @@ Resources:
   #     circular dependency. Enable CloudTrail Data Events post-deployment.
   #   • NO lifecycle transitions – records must remain query-accessible
   # ============================================================
-  AuditBucket:
+  ProdAuditBucket:
     Type: AWS::S3::Bucket
+    Condition: IsProd
     Properties:
-      BucketName: !Sub "umed-audit-logs-${Environment}"
+      BucketName: "umed-audit-logs-prod"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -342,7 +1078,7 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKey
+              KMSMasterKeyID: !Ref ProdKmsKey
 
       # Object Lock – COMPLIANCE mode, 7 years (2555 days)
       ObjectLockEnabled: true
@@ -359,17 +1095,18 @@ Resources:
         - Key: Layer
           Value: audit
         - Key: Environment
-          Value: !Ref Environment
+          Value: PROD
         - Key: DataClass
           Value: Operational
         - Key: Owner
           Value: data-engineering@uMed.com
 
   # Bucket policy (allows CloudTrail to write to the audit bucket)
-  AuditBucketPolicy:
+  ProdAuditBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    Condition: IsProd
     Properties:
-      Bucket: !Ref AuditBucket
+      Bucket: !Ref ProdAuditBucket
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -378,26 +1115,253 @@ Resources:
             Principal:
               Service: cloudtrail.amazonaws.com
             Action: s3:GetBucketAcl
-            Resource: !GetAtt AuditBucket.Arn
+            Resource: !GetAtt ProdAuditBucket.Arn
 
           - Sid: AllowCloudTrailPutObject
             Effect: Allow
             Principal:
               Service: cloudtrail.amazonaws.com
             Action: s3:PutObject
-            Resource: !Sub "${AuditBucket.Arn}/cloudtrail/*"
+            Resource: !Sub "${ProdAuditBucket.Arn}/cloudtrail/*"
             Condition:
               StringEquals:
                 s3:x-amz-acl: bucket-owner-full-control
+
+
+  DevAuditBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-audit-logs-dev"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning MUST be enabled for Object Lock
+      VersioningConfiguration:
+        Status: Enabled
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref DevKmsKey
+
+      # Object Lock – COMPLIANCE mode, 7 years (2555 days)
+      ObjectLockEnabled: true
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Mode: COMPLIANCE
+            Days: 2555  
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: audit
+        - Key: Environment
+          Value: DEV
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+  # Bucket policy (allows CloudTrail to write to the audit bucket)
+  DevAuditBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: IsNonProd
+    Properties:
+      Bucket: !Ref DevAuditBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudTrailACLCheck
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt DevAuditBucket.Arn
+
+          - Sid: AllowCloudTrailPutObject
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub "${DevAuditBucket.Arn}/cloudtrail/*"
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+
+                
+  QaAuditBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-audit-logs-qa"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning MUST be enabled for Object Lock
+      VersioningConfiguration:
+        Status: Enabled
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref QaKmsKey
+
+      # Object Lock – COMPLIANCE mode, 7 years (2555 days)
+      ObjectLockEnabled: true
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Mode: COMPLIANCE
+            Days: 2555  
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: audit
+        - Key: Environment
+          Value: QA
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+  # Bucket policy (allows CloudTrail to write to the audit bucket)
+  QaAuditBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: IsNonProd
+    Properties:
+      Bucket: !Ref QaAuditBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudTrailACLCheck
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt QaAuditBucket.Arn
+
+          - Sid: AllowCloudTrailPutObject
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub "${QaAuditBucket.Arn}/cloudtrail/*"
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+
+
+  UatAuditBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-audit-logs-uat"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning MUST be enabled for Object Lock
+      VersioningConfiguration:
+        Status: Enabled
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref UatKmsKey
+
+      # Object Lock – COMPLIANCE mode, 7 years (2555 days)
+      ObjectLockEnabled: true
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Mode: COMPLIANCE
+            Days: 2555  
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: audit
+        - Key: Environment
+          Value: UAT
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+  # Bucket policy (allows CloudTrail to write to the audit bucket)
+  UatAuditBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: IsNonProd
+    Properties:
+      Bucket: !Ref UatAuditBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudTrailACLCheck
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt UatAuditBucket.Arn
+
+          - Sid: AllowCloudTrailPutObject
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub "${UatAuditBucket.Arn}/cloudtrail/*"
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+
 
   # ============================================================
   # 7. CONTROL BUCKET  –  umed-control-registry-{env}
   # Stores: pipeline state files and checkpoint records
   # ============================================================
-  ControlBucket:
+  ProdControlBucket:
     Type: AWS::S3::Bucket
+    Condition: IsProd
     Properties:
-      BucketName: !Sub "umed-control-registry-${Environment}"
+      BucketName: "umed-control-registry-prod"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -418,7 +1382,7 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKey
+              KMSMasterKeyID: !Ref ProdKmsKey
 
       # Expire non-current versions after 30 days to control storage cost
       LifecycleConfiguration:
@@ -434,20 +1398,166 @@ Resources:
         - Key: Layer
           Value: control
         - Key: Environment
-          Value: !Ref Environment
+          Value: PROD
         - Key: DataClass
           Value: Operational
         - Key: Owner
           Value: data-engineering@uMed.com
 
+
+  DevControlBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-control-registry-dev"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning enabled for checkpoint history recovery
+      VersioningConfiguration:
+        Status: Enabled
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref DevKmsKey
+
+      # Expire non-current versions after 30 days to control storage cost
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireNonCurrentVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: control
+        - Key: Environment
+          Value: DEV
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  QaControlBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-control-registry-qa"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning enabled for checkpoint history recovery
+      VersioningConfiguration:
+        Status: Enabled
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref QaKmsKey
+
+      # Expire non-current versions after 30 days to control storage cost
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireNonCurrentVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: control
+        - Key: Environment
+          Value: QA
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  UatControlBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-control-registry-uat"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      # Versioning enabled for checkpoint history recovery
+      VersioningConfiguration:
+        Status: Enabled
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref UatKmsKey
+
+      # Expire non-current versions after 30 days to control storage cost
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireNonCurrentVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: control
+        - Key: Environment
+          Value: UAT
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
   # ============================================================
   # 8. ATHENA RESULTS BUCKET  –  umed-athena-results-{env}
   # Stores: temporary Athena query result files
   # ============================================================
-  AthenaResultsBucket:
+  ProdAthenaResultsBucket:
     Type: AWS::S3::Bucket
+    Condition: IsProd
     Properties:
-      BucketName: !Sub "umed-athena-results-${Environment}"
+      BucketName: "umed-athena-results-prod"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -467,7 +1577,7 @@ Resources:
           - BucketKeyEnabled: true
             ServerSideEncryptionByDefault:
               SSEAlgorithm: aws:kms
-              KMSMasterKeyID: !Ref KmsKey
+              KMSMasterKeyID: !Ref ProdKmsKey
 
       # Delete Athena results after 7 days 
       LifecycleConfiguration:
@@ -482,109 +1592,274 @@ Resources:
         - Key: Layer
           Value: athena-results
         - Key: Environment
-          Value: !Ref Environment
+          Value: PROD
         - Key: DataClass
           Value: Operational
         - Key: Owner
           Value: data-engineering@uMed.com
 
+
+  DevAthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-athena-results-dev"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref DevKmsKey
+
+      # Delete Athena results after 7 days 
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteAthenaResults
+            Status: Enabled
+            ExpirationInDays: 7
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: athena-results
+        - Key: Environment
+          Value: DEV
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  QaAthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-athena-results-qa"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref QaKmsKey
+
+      # Delete Athena results after 7 days 
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteAthenaResults
+            Status: Enabled
+            ExpirationInDays: 7
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: athena-results
+        - Key: Environment
+          Value: QA
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
+
+
+  UatAthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsNonProd
+    Properties:
+      BucketName: "umed-athena-results-uat"
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+      VersioningConfiguration:
+        Status: Suspended
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref UatKmsKey
+
+      # Delete Athena results after 7 days 
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteAthenaResults
+            Status: Enabled
+            ExpirationInDays: 7
+
+      Tags:
+        - Key: Project
+          Value: uMed
+        - Key: Layer
+          Value: athena-results
+        - Key: Environment
+          Value: UAT
+        - Key: DataClass
+          Value: Operational
+        - Key: Owner
+          Value: data-engineering@uMed.com
 # ──────────────────────────────────────────────────────────────────────────────
 # Outputs
 # ──────────────────────────────────────────────────────────────────────────────
 Outputs:
 
-  RawBucketName:
-    Description: Raw FHIR records bucket name
-    Value: !Ref RawBucket
-    Export:
-      Name: !Sub "umed-${Environment}-raw-bucket-name"
+  # =====================================================
+  # PROD OUTPUTS
+  # =====================================================
 
-  RawBucketArn:
-    Description: Raw FHIR records bucket ARN
-    Value: !GetAtt RawBucket.Arn
-    Export:
-      Name: !Sub "umed-${Environment}-raw-bucket-arn"
+  ProdRawBucketName:
+    Condition: IsProd
+    Value: !Ref ProdRawBucket
 
-  StagingBucketName:
-    Description: Staging bucket name
-    Value: !Ref StagingBucket
-    Export:
-      Name: !Sub "umed-${Environment}-staging-bucket-name"
+  ProdRawBucketArn:
+    Condition: IsProd
+    Value: !GetAtt ProdRawBucket.Arn
 
-  StagingBucketArn:
-    Description: Staging bucket ARN
-    Value: !GetAtt StagingBucket.Arn
-    Export:
-      Name: !Sub "umed-${Environment}-staging-bucket-arn"
+  ProdStagingBucketName:
+    Condition: IsProd
+    Value: !Ref ProdStagingBucket
 
-  IntermediateBucketName:
-    Description: Intermediate bucket name
-    Value: !Ref IntermediateBucket
-    Export:
-      Name: !Sub "umed-${Environment}-intermediate-bucket-name"
+  ProdStagingBucketArn:
+    Condition: IsProd
+    Value: !GetAtt ProdStagingBucket.Arn
 
-  IntermediateBucketArn:
-    Description: Intermediate bucket ARN
-    Value: !GetAtt IntermediateBucket.Arn
-    Export:
-      Name: !Sub "umed-${Environment}-intermediate-bucket-arn"
+  ProdIntermediateBucketName:
+    Condition: IsProd
+    Value: !Ref ProdIntermediateBucket
 
-  DataWarehouseBucketName:
-    Description: Data Warehouse bucket name
-    Value: !Ref DataWarehouseBucket
-    Export:
-      Name: !Sub "umed-${Environment}-dw-bucket-name"
+  ProdIntermediateBucketArn:
+    Condition: IsProd
+    Value: !GetAtt ProdIntermediateBucket.Arn
 
-  DataWarehouseBucketArn:
-    Description: Data Warehouse bucket ARN
-    Value: !GetAtt DataWarehouseBucket.Arn
-    Export:
-      Name: !Sub "umed-${Environment}-dw-bucket-arn"
+  ProdDataWarehouseBucketName:
+    Condition: IsProd
+    Value: !Ref ProdDataWarehouseBucket
 
-  AnalyticsBucketName:
-    Description: Analytics bucket name
-    Value: !Ref AnalyticsBucket
-    Export:
-      Name: !Sub "umed-${Environment}-analytics-bucket-name"
+  ProdDataWarehouseBucketArn:
+    Condition: IsProd
+    Value: !GetAtt ProdDataWarehouseBucket.Arn
 
-  AnalyticsBucketArn:
-    Description: Analytics bucket ARN
-    Value: !GetAtt AnalyticsBucket.Arn
-    Export:
-      Name: !Sub "umed-${Environment}-analytics-bucket-arn"
+  ProdAnalyticsBucketName:
+    Condition: IsProd
+    Value: !Ref ProdAnalyticsBucket
 
-  AuditBucketName:
-    Description: Audit logs bucket name
-    Value: !Ref AuditBucket
-    Export:
-      Name: !Sub "umed-${Environment}-audit-bucket-name"
+  ProdAnalyticsBucketArn:
+    Condition: IsProd
+    Value: !GetAtt ProdAnalyticsBucket.Arn
 
-  AuditBucketArn:
-    Description: Audit logs bucket ARN (use in CloudTrail configuration)
-    Value: !GetAtt AuditBucket.Arn
-    Export:
-      Name: !Sub "umed-${Environment}-audit-bucket-arn"
+  ProdAuditBucketName:
+    Condition: IsProd
+    Value: !Ref ProdAuditBucket
 
-  ControlBucketName:
-    Description: Control / registry bucket name
-    Value: !Ref ControlBucket
-    Export:
-      Name: !Sub "umed-${Environment}-control-bucket-name"
+  ProdAuditBucketArn:
+    Condition: IsProd
+    Value: !GetAtt ProdAuditBucket.Arn
 
-  ControlBucketArn:
-    Description: Control / registry bucket ARN
-    Value: !GetAtt ControlBucket.Arn
-    Export:
-      Name: !Sub "umed-${Environment}-control-bucket-arn"
+  ProdControlBucketName:
+    Condition: IsProd
+    Value: !Ref ProdControlBucket
 
-  AthenaResultsBucketName:
-    Description: Athena query results bucket name
-    Value: !Ref AthenaResultsBucket
-    Export:
-      Name: !Sub "umed-${Environment}-athena-results-bucket-name"
+  ProdControlBucketArn:
+    Condition: IsProd
+    Value: !GetAtt ProdControlBucket.Arn
 
-  AthenaResultsBucketArn:
-    Description: Athena query results bucket ARN
-    Value: !GetAtt AthenaResultsBucket.Arn
-    Export:
-      Name: !Sub "umed-${Environment}-athena-results-bucket-arn"
+  ProdAthenaResultsBucketName:
+    Condition: IsProd
+    Value: !Ref ProdAthenaResultsBucket
+
+  ProdAthenaResultsBucketArn:
+    Condition: IsProd
+    Value: !GetAtt ProdAthenaResultsBucket.Arn
+
+  ProdKmsKeyArn:
+    Condition: IsProd
+    Value: !GetAtt ProdKmsKey.Arn
+
+  # =====================================================
+  # NONPROD OUTPUTS
+  # =====================================================
+
+  DevKmsKeyArn:
+    Condition: IsNonProd
+    Value: !GetAtt DevKmsKey.Arn
+
+  QaKmsKeyArn:
+    Condition: IsNonProd
+    Value: !GetAtt QaKmsKey.Arn
+
+  UatKmsKeyArn:
+    Condition: IsNonProd
+    Value: !GetAtt UatKmsKey.Arn
+
+  DevRawBucketName:
+    Condition: IsNonProd
+    Value: !Ref DevRawBucket
+
+  QaRawBucketName:
+    Condition: IsNonProd
+    Value: !Ref QaRawBucket
+
+  UatRawBucketName:
+    Condition: IsNonProd
+    Value: !Ref UatRawBucket
+
+  DevAuditBucketName:
+    Condition: IsNonProd
+    Value: !Ref DevAuditBucket
+
+  QaAuditBucketName:
+    Condition: IsNonProd
+    Value: !Ref QaAuditBucket
+
+  UatAuditBucketName:
+    Condition: IsNonProd
+    Value: !Ref UatAuditBucket
+
+  DevControlBucketName:
+    Condition: IsNonProd
+    Value: !Ref DevControlBucket
+
+  QaControlBucketName:
+    Condition: IsNonProd
+    Value: !Ref QaControlBucket
+
+  UatControlBucketName:
+    Condition: IsNonProd
+    Value: !Ref UatControlBucket
