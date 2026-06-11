@@ -99,7 +99,7 @@ Resources:
     Type: AWS::KMS::Alias
     Condition: IsNonProd
     Properties:
-      AliasName: alias/umed-data-platform-dev-s3-key
+      AliasName: alias/umed-data-platform-devily-s3-key
       TargetKeyId: !Ref DevKmsKey
 
   QaKmsKey:
@@ -235,7 +235,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd 
     Properties:
-      BucketName: "umed-raw-ehr-dev"
+      BucketName: "umed-raw-ehr-devily"
 
       # Block all public access 
       PublicAccessBlockConfiguration:
@@ -438,7 +438,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-stg-ehr-dev"
+      BucketName: "umed-stg-ehr-devily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -602,7 +602,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-int-ehr-dev"
+      BucketName: "umed-int-ehr-devily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -766,7 +766,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-dw-dev"
+      BucketName: "umed-dw-devily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -929,7 +929,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-analytics-dev"
+      BucketName: "umed-analytics-devily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -1132,7 +1132,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-audit-logs-dev"
+      BucketName: "umed-audit-logs-devily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -1409,7 +1409,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-control-registry-dev"
+      BucketName: "umed-control-registry-devily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -1603,7 +1603,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-athena-results-dev"
+      BucketName: "umed-athena-results-devily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
