@@ -133,7 +133,7 @@ Resources:
     Type: AWS::KMS::Alias
     Condition: IsNonProd
     Properties:
-      AliasName: alias/umed-data-platform-qa-s3-key
+      AliasName: alias/umed-data-platform-qaily-s3-key
       TargetKeyId: !Ref QaKmsKey
 
   UatKmsKey:
@@ -167,7 +167,7 @@ Resources:
     Type: AWS::KMS::Alias
     Condition: IsNonProd
     Properties:
-      AliasName: alias/umed-data-platform-uat-s3-key
+      AliasName: alias/umed-data-platform-uatily-s3-key
       TargetKeyId: !Ref UatKmsKey
 
   # ============================================================
@@ -287,7 +287,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd 
     Properties:
-      BucketName: "umed-raw-ehr-qa"
+      BucketName: "umed-raw-ehr-qaily"
 
       # Block all public access 
       PublicAccessBlockConfiguration:
@@ -339,7 +339,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd 
     Properties:
-      BucketName: "umed-raw-ehr-uat"
+      BucketName: "umed-raw-ehr-uatily"
 
       # Block all public access 
       PublicAccessBlockConfiguration:
@@ -477,7 +477,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-stg-ehr-qa"
+      BucketName: "umed-stg-ehr-qaily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -516,7 +516,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-stg-ehr-uat"
+      BucketName: "umed-stg-ehr-uatily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -641,7 +641,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-int-ehr-qa"
+      BucketName: "umed-int-ehr-qaily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -680,7 +680,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-int-ehr-uat"
+      BucketName: "umed-int-ehr-uatily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -805,7 +805,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-dw-qa"
+      BucketName: "umed-dw-qaily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -844,7 +844,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-dw-uat"
+      BucketName: "umed-dw-uatily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -968,7 +968,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-analytics-qa"
+      BucketName: "umed-analytics-qaily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -1007,7 +1007,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-analytics-uat"
+      BucketName: "umed-analytics-uatily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -1207,7 +1207,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-audit-logs-qa"
+      BucketName: "umed-audit-logs-qaily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -1282,7 +1282,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-audit-logs-uat"
+      BucketName: "umed-audit-logs-uatily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -1457,7 +1457,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-control-registry-qa"
+      BucketName: "umed-control-registry-qaily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -1505,7 +1505,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-control-registry-uat"
+      BucketName: "umed-control-registry-uatily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -1649,7 +1649,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-athena-results-qa"
+      BucketName: "umed-athena-results-qaily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -1695,7 +1695,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: IsNonProd
     Properties:
-      BucketName: "umed-athena-results-uat"
+      BucketName: "umed-athena-results-uatily"
 
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
